@@ -1,0 +1,29 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Clone Repo') {
+            steps {
+                git 'https://github.com/meetsaurabhh/OTT-Platform-Clone'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ott-app .'
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                sh 'docker run --rm ott-app npm test'
+            }
+        }
+        
+        stage('Deploy Locally') {
+            steps {
+                sh 'docker run -d -p 3000:3000 ott-app'
+            }
+        }
+    }
+}
