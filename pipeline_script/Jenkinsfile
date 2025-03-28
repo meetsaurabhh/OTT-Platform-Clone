@@ -1,28 +1,43 @@
 pipeline {
     agent any
-    
+
+    environment {
+        SONARQUBE_URL = 'http://localhost:9000'  // Update if needed
+        SONARQUBE_TOKEN = credentials('squ_65901f66e5d55b33efefd71042951bf1ad6d185e') // Use the stored token ID
+    }
+
     stages {
-        stage('Clone Repo') {
+        stage('Checkout Code') {
             steps {
-                git 'https://github.com/meetsaurabhh/OTT-Platform-Clone'
+                git 'https://github.com/meetsaurabhh/OTT-Platform-Clone.git' // Update your repo URL
             }
         }
-        
-        stage('Build Docker Image') {
+
+        stage('SonarQube Analysis') {
             steps {
-                sh 'docker build -t ott-app .'
+                script {
+                    withSonarQubeEnv('SonarQube') {  // Use the name from Jenkins global tool settings
+                        sh '''
+                            mvn sonar:sonar \
+                            -Dsonar.projectKey=OTT-Platform-Clone \
+                            -Dsonar.host.url=${SONARQUBE_URL} \
+                            -Dsonar.login=${SONARQUBE_TOKEN}
+                        '''
+                    }
+                }
             }
         }
-        
-        stage('Run Tests') {
+
+        stage('Quality Gate Check') {
             steps {
-                sh 'docker run --rm ott-app npm test'
-            }
-        }
-        
-        stage('Deploy Locally') {
-            steps {
-                sh 'docker run -d -p 3000:3000 ott-app'
+                script {
+                    timeout(time: 5, unit: 'MINUTES') { // Wait for analysis result
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Quality Gate failed: ${qg.status}"
+                        }
+                    }
+                }
             }
         }
     }
